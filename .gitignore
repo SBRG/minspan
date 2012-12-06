@@ -1,0 +1,3 @@
+*.pyc
+gurobi.log
+snapshots/*
