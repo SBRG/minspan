@@ -3,7 +3,7 @@ import os
 from fractions import Fraction
 from datetime import datetime
 from itertools import repeat
-from multiprocessing import Pool
+from warnings import warn
 try:
     from cPickle import dumps, loads
 except ImportError:
@@ -162,14 +162,25 @@ def prepare_model(model):
     Ensures that 0 is always a possible solution in every vector, and
     that all upper and lower bounds are either 0 or 1000"""
     for reaction in model.reactions:
+        if reaction.lower_bound > reaction.upper_bound:
+            raise Exception()
+        elif reaction.lower_bound == reaction.upper_bound:
+            raise Exception()
         if reaction.lower_bound > 0:
             reaction.lower_bound = 0
-        elif reaction.lower_bound < 0:
+            warn("Fixed: reaction %s flux range did not include 0" % reaction)
+        elif reaction.lower_bound < 0 and reaction.lower_bound != -1 * default_bound:
             reaction.lower_bound = -1 * default_bound
+            warn("Fixed: reaction %s has a non-default lower bound" % reaction)
         if reaction.upper_bound < 0:
             reaction.upper_bound = 0
-        elif reaction.upper_bound > 0:
+            warn("Fixed: reaction %s flux range did not include 0" % reaction)
+        elif reaction.upper_bound > 0 and reaction.upper_bound != default_bound:
             reaction.upper_bound = default_bound
+            warn("Fixed: reaction %s has a non-default upper bound" % reaction)
+        if len(reaction._metabolites) > 15:
+            warn("Is reaction %s a biomass function" % reaction
+    # TODO fva check feasibility for each reaction
 
 
 def calculate_minspan_column_helper(args):
@@ -419,11 +430,11 @@ def minspan(model, starting_fluxes=None, coverage=10, cores=4, processes="auto",
                 if improvement[choice] < 0:
                     print "result was worse by %d (round %d, column %d)" % \
                         (-1 * improvement[choice], k, index_choice)
-                    break  # because it is sorted, all subsequent ones are worse
+                    break  # because it is sorted all subsequent ones are worse
                 if minimized_nnz[choice] == 0:
                     print "solver returned empty vector (round %d, column %d)" % (k, index_choice)
                 if improvement[choice] == 0:
-                    break # because it was sorted, all subsequent ones have no improvement
+                    break # because it is sorted all subsequent ones are worse
                 flux_choice = flux_vectors[choice]
                 test_fluxes = fluxes.copy()
                 test_fluxes[:, index_choice] = flux_choice
@@ -439,7 +450,8 @@ def minspan(model, starting_fluxes=None, coverage=10, cores=4, processes="auto",
             # replace the vector if a better one was found
             if best_choice is not None:
                 flux = flux_vectors[best_choice]
-                scaled_flux = scale_vector(flux, S, lb, ub)
+                #scaled_flux = scale_vector(flux, S, lb, ub)
+                scaled_flux = flux / sum(flux * flux)  # normalize
                 column_index = column_indices[best_choice]
                 fluxes[:, column_index] = scaled_flux
 
@@ -455,11 +467,7 @@ def minspan(model, starting_fluxes=None, coverage=10, cores=4, processes="auto",
                 savemat(column_filename % (k, column_index, now()),
                     {"fluxes": dok_matrix(fluxes)}, oned_as="column")
         # round is over
-        #from time import time
-        #start = time()
         #scale_matrix(fluxes, S, lb, ub)  # attempt to "integerize" values
-        #if verbose:
-        #    print "scaled matrix in %.2f seconds" % (time() - start)
         # save the result of the entire round using a sparse matrix
         savemat(round_filename % (k, now()),
             {"fluxes": dok_matrix(fluxes)}, oned_as="column")
@@ -485,9 +493,8 @@ if __name__ == "__main__":
     from time import time
     model = load_matlab_model("testing_models.mat", "ecoli_core")
     S = model.to_array_based_model().S
-    fluxes = array(loadmat("coreM9fluxes.mat")["fluxesM9"], dtype=float64)
     start = time()
-    solved_fluxes = minspan(model, cores=2, timelimit=30, verbose=True)
+    solved_fluxes = minspan(model, cores=1, verbose=True)
     print "solved in %.2f seconds" % (time() - start)
     print "nnz", nnz(solved_fluxes)
     print "rank", matrix_rank(solved_fluxes)
