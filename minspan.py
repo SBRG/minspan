@@ -290,7 +290,7 @@ def calculate_minspan_column(model_pickle, original_fluxes, column_index, N,
 
 def minspan(model, starting_fluxes=None, coverage=10, cores=4, processes="auto",
     mapper=map, solver_name="auto", timelimit=30, verbose=False,
-    first_round_cores=None, first_round_timelimit=0.5):
+    first_round_cores=None, first_round_timelimit=2):
     """run minspan
 
     Parameters
@@ -446,7 +446,7 @@ def minspan(model, starting_fluxes=None, coverage=10, cores=4, processes="auto",
                     print "rank changed (round %d, column %d)" % (k, index_choice)
                     continue
                 if abs(S * test_fluxes).max() > default_max_error:
-                    print "No longer null space: error of %E (round %d, column %d" % \
+                    print "No longer null space: error of %E (round %d, column %d)" % \
                         (abs(S * test_fluxes).max(), k, index_choice)
                     continue
                 # if we reach this point, then we have a suitable vector
