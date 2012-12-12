@@ -47,6 +47,7 @@ def make_binary(reaction):
 
 
 def add_indicators_to_model(model):
+    """adds binary indicators for each reaction to the model"""
     indicators = []
     reactions = [i for i in model.reactions]
     for reaction in reactions:
@@ -163,9 +164,9 @@ def prepare_model(model):
     that all upper and lower bounds are either 0 or 1000"""
     for reaction in model.reactions:
         if reaction.lower_bound > reaction.upper_bound:
-            raise Exception()
+            raise ValueError("reaction %s: lower bound > upper bound" % reaction)
         elif reaction.lower_bound == reaction.upper_bound:
-            raise Exception()
+            raise Exception("reaction %s has a fixed flux" % reaction)
         if reaction.lower_bound > 0:
             reaction.lower_bound = 0
             warn("Fixed: reaction %s flux range did not include 0" % reaction)
@@ -179,7 +180,7 @@ def prepare_model(model):
             reaction.upper_bound = default_bound
             warn("Fixed: reaction %s has a non-default upper bound" % reaction)
         if len(reaction._metabolites) > 15:
-            warn("Is reaction %s a biomass function" % reaction
+            warn("Is reaction %s a biomass function" % reaction)
     # TODO fva check feasibility for each reaction
 
 
@@ -189,6 +190,12 @@ def calculate_minspan_column_helper(args):
 
 def calculate_minspan_column(model_pickle, original_fluxes, column_index, N,
                              cores, timelimit, verbose, solver_name):
+    """calculate a single minspan column
+
+    This function minimizes the number of nonzero elements in the column
+    given by column_index while ensuring it remains a feasible vector and
+    linearly independent of all other columns.
+    """
     solver = cobra.solvers.solver_dict[solver_name]
     n = N.shape[0]
     fluxes = original_fluxes.copy()
@@ -247,7 +254,6 @@ def calculate_minspan_column(model_pickle, original_fluxes, column_index, N,
     # create the solver object
     lp = solver.create_problem(problem, objective_sense="minimize")
     # seed the variables with the old solution, and set extra arguments
-    # old_number = nnz(binOldPath)
     if solver_name.startswith("gurobi"):
         for i, variable in enumerate(lp.getVars()):
             if i < n:
@@ -314,7 +320,6 @@ def minspan(model, starting_fluxes=None, coverage=10, cores=4, processes="auto",
         possible runtime is timelimit * dim(null(S)) * coverage
     verbose: boolean
         Whether solver should run verbose
-
     """
     # identify a solver if necessary
     if solver_name == "auto":
@@ -329,7 +334,6 @@ def minspan(model, starting_fluxes=None, coverage=10, cores=4, processes="auto",
     # copy the model, extract S, add indicators, and store indicator-model
     model = model.copy()
     prepare_model(model)
-    # S = model._S.todense()  # want S before the indicators are added
     # We want S before the indicators are added
     S = model.to_array_based_model().S.todense()
     lb = array(model.reactions.list_attr("lower_bound"), dtype=float64)
@@ -498,5 +502,5 @@ if __name__ == "__main__":
     print "solved in %.2f seconds" % (time() - start)
     print "nnz", nnz(solved_fluxes)
     print "rank", matrix_rank(solved_fluxes)
-    print "max_null_error", abs(S * solved_fluxes).max()
+    print "max(S * v) =", abs(S * solved_fluxes).max()
     #from IPython import embed; embed()
