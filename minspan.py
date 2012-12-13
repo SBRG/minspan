@@ -72,7 +72,7 @@ def add_indicators_to_model(model):
     return model
 
 
-def null(S, max_error=default_max_error * 1e-3, svd_tolerance=None):
+def null(S, max_error=default_max_error * 1e-3, rank_cutoff=1e-9):
     """calculate the null space of a matrix
 
     Parameters
@@ -83,10 +83,14 @@ def null(S, max_error=default_max_error * 1e-3, svd_tolerance=None):
     m, n = S.shape  # m is number of metabolites, n is number of reactions
     [u, sigma, v] = svd(S)
     null_mask = ones((n,))
-    rank = matrix_rank(S, tol=svd_tolerance)
+    rank = sum(sigma > rank_cutoff)  # use this instead of matrix_rank
     null_mask[:rank] = 0
+    
     N = compress(null_mask, v, axis=0).T
-    assert rank < n
+    #assert rank < n
+    if rank >= n:
+        warn("rank %d >= %d" % (rank, n))
+        from IPython import embed; embed()
     assert abs(S * N).max() < max_error  # make sure it is a null space
     assert type(N) is matrix
     return N
@@ -102,11 +106,15 @@ def get_factor(number, max_error=1e-6, max_digits=2):
     return 1
 
 
-def scale_vector(vector, S, lb, ub, max_error=1e-6):
+def scale_vector(vector, S, lb, ub, max_error=1e-6, normalize=False):
     """scale a vector
 
     Attempts to scale the vector to the smallest possible integers, while
     maintaining S * vector = 0 and lb <= vector <= ub
+
+    If normalize is True, integer scaling is still performed, but the result
+    is then normalized (||vector|| = 1). If the integer scaling works, this
+    still results in less floating point error.
     """
     def check(x):
         if abs(S * matrix(x).T).max() > max_error:
@@ -114,6 +122,8 @@ def scale_vector(vector, S, lb, ub, max_error=1e-6):
         if (x > ub).any() or (x < lb).any():
             return False
         return True
+    def prepare_return(x):
+        return x / sum(x * x) if normalize else x
     # scale the vector so the smallest entry is 1
     abolute_vector = abs(vector)
     scale = min(abolute_vector[abolute_vector > 1e-3])
@@ -121,16 +131,16 @@ def scale_vector(vector, S, lb, ub, max_error=1e-6):
     min_scaled_vector[abs(min_scaled_vector) < 1e-9] = 0  # round down
     # if scaling makes the solution invalid, return the old one
     if not check(min_scaled_vector):
-        return vector
+        return prepare_return(vector)
     # attempt scale the vector to make all entries integers
     factor = lcm([get_factor(i) for i in min_scaled_vector])
     int_scaled_vector = min_scaled_vector * float(factor)
     if max(abs(int_scaled_vector.round() - int_scaled_vector)) < max_error:
         int_scaled_vector = int_scaled_vector.round()
         if check(int_scaled_vector):
-            return int_scaled_vector
+            return prepare_return(int_scaled_vector)
     # if this point is reached the integer scaling failed
-    return min_scaled_vector
+    return prepare_return(min_scaled_vector)
 
 
 def scale_matrix(fluxes, S, lb, ub, max_error=1e-6):
@@ -454,8 +464,7 @@ def minspan(model, starting_fluxes=None, coverage=10, cores=4, processes="auto",
             # replace the vector if a better one was found
             if best_choice is not None:
                 flux = flux_vectors[best_choice]
-                #scaled_flux = scale_vector(flux, S, lb, ub)
-                scaled_flux = flux / sum(flux * flux)  # normalize
+                scaled_flux = scale_vector(flux, S, lb, ub, normalize=True)
                 column_index = column_indices[best_choice]
                 fluxes[:, column_index] = scaled_flux
 
