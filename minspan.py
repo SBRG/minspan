@@ -444,7 +444,7 @@ def minspan(model, starting_fluxes=None, coverage=10, cores=4, processes="auto",
             improvement = array(previous_nnz) - minimized_nnz
             # empty vectors of just 0 are not actually an improvement
             improvement[minimized_nnz == 0] = 0
-            ranked_choices = improvement.argsort()
+            ranked_choices = improvement.argsort()[::-1]  # reverse sort
             best_choice = None
             for choice in ranked_choices:
                 index_choice = column_indices[choice]
