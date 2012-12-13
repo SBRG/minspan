@@ -13,7 +13,7 @@ import numpy
 from numpy import abs, array, float64, zeros, ones, compress, \
     matrix, argmax, ceil
 from numpy.linalg import matrix_rank, svd
-from scipy.io import savemat
+from scipy.io import loadmat, savemat
 from scipy.sparse import dok_matrix
 from sympy import lcm
 
@@ -299,7 +299,7 @@ def calculate_minspan_column(model_pickle, original_fluxes, column_index, N,
 
 
 def minspan(model, starting_fluxes=None, coverage=10, cores=4, processes="auto",
-    mapper=map, solver_name="auto", timelimit=30, verbose=False,
+    mapper=map, solver_name="auto", timelimit=30, verbose=True,
     first_round_cores=None, first_round_timelimit=2):
     """run minspan
 
@@ -370,6 +370,13 @@ def minspan(model, starting_fluxes=None, coverage=10, cores=4, processes="auto",
     if starting_fluxes is None:
         fluxes = array(N, dtype=float64)
     else:  # make sure the flux vector passed in still spans the null space
+        if starting_fluxes == "auto":
+            starting_filenames = [i for i in os.listdir(snapshot_dir) if
+                model.id in i]
+            round_filenames = sorted((i for i in starting_filenames if "column" in i), reverse=True)
+            starting_fluxes = loadmat(snapshot_dir + round_filenames[0])["fluxes"]
+            print "loaded starting_fluxes from %s" % (snapshot_dir + round_filenames[0])
+            None  #TODO: look in snapshots
         fluxes = array(dok_matrix(starting_fluxes).todense(), dtype=float64)
         if N.shape != fluxes.shape:
             raise ValueError("starting fluxes should be the same size as null")
@@ -502,7 +509,6 @@ def minspan(model, starting_fluxes=None, coverage=10, cores=4, processes="auto",
 
 if __name__ == "__main__":
     from cobra.io import load_matlab_model
-    from scipy.io import loadmat
     from time import time
     model = load_matlab_model("testing_models.mat", "ecoli_core")
     S = model.to_array_based_model().S
