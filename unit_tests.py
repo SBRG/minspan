@@ -6,7 +6,15 @@ import sys
 import cobra
 from cobra.io import load_matlab_model
 
-from multiprocessing import Pool
+try:
+    from multiprocessing import Pool
+except:
+    Pool = None
+
+try:
+    import setup_cluster
+except:
+    setup_cluster = None
 
 testing_models_filepath = "testing_models.mat"  # todo absolute path
 
@@ -45,6 +53,26 @@ class TestMinspanEcoliCore(TestCase):
         solved_fluxes = minspan(self.model, cores=2, timelimit=45,
             verbose=False, solver_name="cplex", mapper=pool.map)
         test_ecoli_core_model(self, solved_fluxes)
+
+    @skipIf("gurobi" not in cobra.solvers.solver_dict, "gurobi required")
+    @skipIf(setup_cluster is None, "ipython cluster requried")
+    def test_EcoliCore_gurobi_ipcluster(self):
+        client, view = setup_cluster.start_engines()
+        hotstart = null(self.S.todense())
+        solved_fluxes = minspan(self.model, starting_fluxes=hotstart,
+            mapper=view.map_sync, verbose=False, solver_name="gurobi")
+        test_ecoli_core_model(self, solved_fluxes)
+        setup_cluster.stop_engines()
+
+    @skipIf("cplex" not in cobra.solvers.solver_dict, "cplex required")
+    @skipIf(setup_cluster is None, "ipython cluster requried")
+    def test_EcoliCore_gurobi_ipcluster(self):
+        client, view = setup_cluster.start_engines()
+        hotstart = null(self.S.todense())
+        solved_fluxes = minspan(self.model, starting_fluxes=hotstart,
+            mapper=view.map_sync, verbose=False, solver_name="cplex")
+        test_ecoli_core_model(self, solved_fluxes)
+        setup_cluster.stop_engines()
 
 class TestMathFunctions(TestCase):
     def test_nnz(self):
