@@ -30,9 +30,12 @@ final_dir = os.path.join("final", "")
 snapshot_dir = os.path.join("snapshots", "")
 if "SCRATCH" in os.environ:  # snapshots go in $SCRATCH if it exists
     snapshot_dir = os.join(os.environ["SCRATCH"], "snapshots", "")
-for dir in [snapshot_dir, final_dir]:
-    if not os.path.isdir(dir):
-        os.mkdir(dir)
+
+def make_directories():
+    """make directories to write out result files"""
+    for dir in [snapshot_dir, final_dir]:
+        if not os.path.isdir(dir):
+            os.mkdir(dir)
 
 def now():
     """return the time and date as a filename-friendly string"""
@@ -352,8 +355,9 @@ def minspan(model, starting_fluxes=None, coverage=10, cores=4, processes="auto",
     for indicator in model.reactions.query(indicator_prefix):
         indicator.objective_coefficient = 1
     model_pickle = dumps(model)
+    # figure out saving filenames
+    make_directories()
     base_filename = snapshot_dir + "/save_"
-
     try:
         model_id = "%s_" % (model.id)
     except:
@@ -373,7 +377,7 @@ def minspan(model, starting_fluxes=None, coverage=10, cores=4, processes="auto",
         if starting_fluxes == "auto":
             starting_filenames = [i for i in os.listdir(snapshot_dir) if
                 model.id in i]
-            round_filenames = sorted((i for i in starting_filenames if "column" in i), reverse=True)
+            round_filenames = sorted((i for i in starting_filenames if "final" in i), reverse=True)
             starting_fluxes = loadmat(snapshot_dir + round_filenames[0])["fluxes"]
             print "loaded starting_fluxes from %s" % (snapshot_dir + round_filenames[0])
             None  #TODO: look in snapshots
