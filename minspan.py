@@ -20,10 +20,13 @@ from sympy import lcm
 import cobra  # https://github.com/opencobra/cobrapy
 
 # define constants
+
+default_max_error = 1e-6        # maximum allowed value in S * v
+default_bound = 1000.0          # absolute value for nonzero reaction bounds
+default_rank_eps = 1e-9         # epsilon when calculating rank from svd
 indicator_prefix = "indicator_"
-default_max_error = 1e-6
-default_bound = 1000.0
 acceptable_status = ('optimal', 'time_limit')
+
 
 # create directories to store generated files
 final_dir = os.path.join("final", "")
@@ -75,7 +78,7 @@ def add_indicators_to_model(model):
     return model
 
 
-def null(S, max_error=default_max_error * 1e-3, rank_cutoff=1e-9):
+def null(S, max_error=default_max_error * 1e-3, rank_cutoff=default_rank_eps):
     """calculate the null space of a matrix
 
     Parameters
@@ -129,7 +132,7 @@ def scale_vector(vector, S, lb, ub, max_error=1e-6, normalize=False):
         return x / sum(x * x) if normalize else x
     # scale the vector so the smallest entry is 1
     abolute_vector = abs(vector)
-    scale = min(abolute_vector[abolute_vector > 1e-3])
+    scale = min(abolute_vector[abolute_vector > 1e-5])
     min_scaled_vector = vector * (1.0 / scale)
     min_scaled_vector[abs(min_scaled_vector) < 1e-9] = 0  # round down
     # if scaling makes the solution invalid, return the old one
@@ -463,7 +466,7 @@ def minspan(model, starting_fluxes=None, coverage=10, cores=4, processes="auto",
                 flux_choice = flux_vectors[choice]
                 test_fluxes = fluxes.copy()
                 test_fluxes[:, index_choice] = flux_choice
-                if matrix_rank(test_fluxes) != null_dim:
+                if matrix_rank(test_fluxes, tol=default_rank_eps) != null_dim:
                     print "rank changed (round %d, column %d)" % (k, index_choice)
                     continue
                 if abs(S * test_fluxes).max() > default_max_error:
