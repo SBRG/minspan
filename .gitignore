@@ -1,4 +1,4 @@
 *.pyc
 gurobi.log
-snapshots/*
+snapshots
 profile_minspan/*
