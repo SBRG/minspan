@@ -313,8 +313,10 @@ def minspan(model, starting_fluxes=None, coverage=10, cores=4, processes="auto",
     ----------
     model: cobra.Model object
         The model to calculate the minspan for
-    starting_fluxes: a 2-dimensional numpy.ndarray object or None
-        Initial starting fluxes to use for the minspan
+    starting_fluxes: a 2-dimensional numpy.ndarray object, "auto", or None
+        Initial starting fluxes to use for the minspan. If this is set to
+        "auto", then automatically attempt to load the last endpoint from
+        a previous run.
     coverage: int
         The maximum number of times to cycle through every column and minimize
     cores: int
@@ -322,7 +324,8 @@ def minspan(model, starting_fluxes=None, coverage=10, cores=4, processes="auto",
     processes: int or "auto"
         The number of columns to minimize at once. Use this to scale minspan
         across multiple nodes in a cluster, with each node minimizing a single
-        column.
+        column. If set to auto, this will be the number of parallel processes
+        used in the mapper.
     mapper: function
         Function to map arguments on to another function, equivalent to
         the python function map. This is useful for parallelizing minspan by
@@ -333,7 +336,7 @@ def minspan(model, starting_fluxes=None, coverage=10, cores=4, processes="auto",
         then cplex, then take the first solver found if neither are available.
     timelimit: int or float
         The maximum amount of time for each MILP problem (seconds). The maximum
-        possible runtime is timelimit * dim(null(S)) * coverage
+        possible runtime is ~ timelimit * dim(null(S)) * coverage
     verbose: boolean
         Whether solver should run verbose
     """
